@@ -112,33 +112,39 @@ impl HttpSink for HecSinkConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
-        let mut event = event.into_log();
+        let event = event.into_log();
 
-        let host = event.get(&self.host_key).cloned();
+        let host = event.get(&self.host_key);
+
         let timestamp = if let Some(Value::Timestamp(ts)) =
-            event.remove(&event::log_schema().timestamp_key())
+            event.get(&event::log_schema().timestamp_key())
         {
             ts.timestamp()
         } else {
             chrono::Utc::now().timestamp()
         };
 
-        let mut body = match self.encoding.codec() {
-            Encoding::Json => event_to_json(event, &self.indexed_fields, timestamp),
+        let mut body= match self.encoding.codec() {
+            Encoding::Json => event_to_json(&event, &self.indexed_fields, timestamp),
             Encoding::Text => json!({
                 "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
                 "time": timestamp,
             }),
         };
 
-        if let Some(host) = host {
-            let host = host.to_string_lossy();
-            body["host"] = json!(host);
-        }
 
-        if let Some(index) = &self.index {
-            body["index"] = json!(index);
-        }
+        serde_json::Value::Object(Map())
+
+
+
+        // if let Some(host) = host {
+        //     let host = host.to_string_lossy();
+        //     body["host"] = json!(host);
+        // }
+        //
+        // if let Some(index) = &self.index {
+        //     body["index"] = json!(index);
+        // }
 
         serde_json::to_vec(&body)
             .map_err(|e| error!("Error encoding json body: {}", e))
@@ -220,7 +226,7 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> JsonValue {
+fn event_to_json(event: &LogEvent, indexed_fields: &[Atom], timestamp: i64) -> JsonValue {
     let fields = indexed_fields
         .iter()
         .filter_map(|field| event.get(field).map(|value| (field, value.clone())))

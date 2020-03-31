@@ -18,6 +18,7 @@ mod event;
 mod files;
 mod http;
 mod lua;
+mod splunk_hec;
 
 criterion_group!(
     benches,
@@ -38,7 +39,8 @@ criterion_main!(
     batch::batch,
     files::files,
     lua::lua,
-    event::event
+    event::event,
+    splunk_hec::hec_encode
 );
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
